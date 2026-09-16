@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KayPass - Password Manager</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- HEADER -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <span class="brand-title">KayPass</span>
+      </div>
+      <div id="header-actions" class="header-actions hidden">
+        <button id="btn-open-options" class="icon-btn" title="Cài đặt & Sao lưu">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+        <button id="btn-lock" class="icon-btn danger" title="Khóa ngay">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+            <line x1="12" y1="2" x2="12" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- VIEW 1: AUTH (SETUP / UNLOCK) -->
+    <main id="view-auth" class="view">
+      <div class="auth-card">
+        <div class="shield-badge">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <path d="M12 8v4"></path>
+            <path d="M12 16h.01"></path>
+          </svg>
+        </div>
+        
+        <!-- INITIAL SETUP FORM -->
+        <div id="auth-setup-form" class="auth-subform hidden">
+          <h2>Tạo Mật khẩu Master</h2>
+          <p class="subtitle">KayPass sử dụng mã hóa AES-256-GCM. Bạn sẽ dùng mật khẩu này để mở khóa dữ liệu.</p>
+          
+          <div class="input-group">
+            <label for="setup-password">Mật khẩu Master</label>
+            <input type="password" id="setup-password" placeholder="Nhập ít nhất 6 ký tự..." autocomplete="off">
+          </div>
+          <div class="input-group">
+            <label for="setup-confirm">Xác nhận mật khẩu</label>
+            <input type="password" id="setup-confirm" placeholder="Nhập lại mật khẩu..." autocomplete="off">
+          </div>
+          <button id="btn-submit-setup" class="btn btn-primary full-width">Khởi tạo KayPass</button>
+        </div>
+
+        <!-- UNLOCK FORM -->
+        <div id="auth-unlock-form" class="auth-subform hidden">
+          <h2>Mở khóa Vault</h2>
+          <p class="subtitle">Nhập Master Password để mở khóa danh sách mật khẩu của bạn.</p>
+          
+          <div class="input-group">
+            <input type="password" id="unlock-password" placeholder="Nhập Mật khẩu Master..." autocomplete="off">
+          </div>
+          <button id="btn-submit-unlock" class="btn btn-primary full-width">Mở khóa</button>
+        </div>
+
+        <div id="auth-error" class="alert alert-error hidden"></div>
+      </div>
+    </main>
+
+    <!-- VIEW 2: VAULT LIST -->
+    <main id="view-vault" class="view hidden">
+      <!-- CURRENT SITE BANNER -->
+      <div id="current-site-bar" class="current-site-bar">
+        <div class="site-info">
+          <span class="dot"></span>
+          <span id="current-domain-text" class="domain">dangtaicai.com</span>
+        </div>
+        <button id="btn-autofill-current" class="btn btn-sm btn-accent hidden">
+          ⚡ Điền tự động
+        </button>
+      </div>
+
+      <!-- SEARCH & FILTER -->
+      <div class="toolbar">
+        <div class="search-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="search-input" placeholder="Tìm kiếm tài khoản, trang web...">
+        </div>
+        <button id="btn-show-add-form" class="btn btn-primary btn-icon" title="Thêm tài khoản mới">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="tabs">
+        <button id="tab-current" class="tab-btn active">Trang hiện tại</button>
+        <button id="tab-all" class="tab-btn">Tất cả tài khoản (<span id="all-count">0</span>)</button>
+      </div>
+
+      <!-- CREDENTIALS LIST -->
+      <div id="credentials-list" class="credentials-list">
+        <!-- Dynamic JS Insertion -->
+      </div>
+
+      <div id="empty-state" class="empty-state hidden">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+          <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+        </svg>
+        <p id="empty-msg">Chưa có tài khoản nào được lưu cho trang này.</p>
+        <button id="btn-add-for-site" class="btn btn-sm btn-outline">+ Thêm cho trang này</button>
+      </div>
+    </main>
+
+    <!-- VIEW 3: ADD / EDIT MODAL -->
+    <div id="modal-form" class="modal hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modal-title">Thêm tài khoản mới</h3>
+          <button id="btn-close-modal" class="close-btn">&times;</button>
+        </div>
+
+        <form id="entry-form" class="form-grid">
+          <input type="hidden" id="entry-id">
+          
+          <div class="form-group">
+            <label for="form-title">Tên ghi nhớ</label>
+            <input type="text" id="form-title" placeholder="VD: GitHub Cá nhân" required>
+          </div>
+
+          <div class="form-group">
+            <label for="form-url">URL Trang web <span class="req">*</span></label>
+            <input type="text" id="form-url" placeholder="https://example.com/login" required>
+          </div>
+
+          <div class="form-group">
+            <label for="form-username">Tên đăng nhập / Email <span class="req">*</span></label>
+            <input type="text" id="form-username" placeholder="user@gmail.com" required autocomplete="off">
+            <small class="hint">Cặp (URL + Username) là duy nhất trong hệ thống.</small>
+          </div>
+
+          <div class="form-group">
+            <div class="label-with-action">
+              <label for="form-password">Mật khẩu <span class="req">*</span></label>
+              <button type="button" id="btn-toggle-generator" class="link-btn">🎲 Tạo MK ngẫu nhiên</button>
+            </div>
+            <div class="input-with-eye">
+              <input type="password" id="form-password" required autocomplete="off">
+              <button type="button" id="btn-toggle-pwd-vis" class="eye-btn" title="Hiện/Ẩn mật khẩu">👁️</button>
+            </div>
+          </div>
+
+          <!-- GENERATOR TOOLKIT PANEL -->
+          <div id="generator-panel" class="generator-panel hidden">
+            <div class="gen-header">
+              <span>Trình tạo mật khẩu an toàn</span>
+              <span id="gen-preview" class="gen-preview"></span>
+            </div>
+            <div class="gen-controls">
+              <label>Độ dài: <strong id="len-val">16</strong></label>
+              <input type="range" id="gen-length" min="8" max="64" value="16">
+              <div class="gen-checkboxes">
+                <label><input type="checkbox" id="gen-upper" checked> A-Z</label>
+                <label><input type="checkbox" id="gen-lower" checked> a-z</label>
+                <label><input type="checkbox" id="gen-digits" checked> 0-9</label>
+                <label><input type="checkbox" id="gen-symbols" checked> !@#$</label>
+              </div>
+              <button type="button" id="btn-apply-generated" class="btn btn-xs btn-accent">Dùng mật khẩu này</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="form-notes">Ghi chú (Tùy chọn)</label>
+            <textarea id="form-notes" rows="2" placeholder="VD: Mã phục hồi, câu hỏi bảo mật..."></textarea>
+          </div>
+
+          <div id="form-error" class="alert alert-error hidden"></div>
+
+          <div class="modal-footer">
+            <button type="button" id="btn-cancel-modal" class="btn btn-secondary">Hủy</button>
+            <button type="submit" id="btn-save-entry" class="btn btn-primary">Lưu tài khoản</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/crypto.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

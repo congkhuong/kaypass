@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KayPass - Cài đặt & Sao lưu Mã hóa</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="brand">
+        <div class="logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <div>
+          <h1>KayPass Security Center</h1>
+          <p class="subtitle">Quản lý sao lưu mã hóa, đồng bộ Google Drive & bên thứ 3</p>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- SECTION 0: GOOGLE DRIVE ENCRYPTED SYNC -->
+      <section class="card highlight-card">
+        <div class="card-header">
+          <div class="icon-circle gdrive">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12.01 1.485L3.896 15.54h5.275l4.394-7.61L12.01 1.485zm4.814 8.337l-4.394 7.611 2.637 4.568h8.791l-4.394-7.61-2.64-4.569zm-9.208 6.718L4.978 22h12.568l2.638-4.569H7.616z"/>
+            </svg>
+          </div>
+          <div>
+            <h2>Đồng bộ Google Drive (Mã hóa Client-Side 100%)</h2>
+            <p class="desc">Lưu bản sao lưu AES-256 vào thư mục ẩn riêng biệt (AppData) trên Google Drive của bạn.</p>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="alert alert-info">
+            🔒 <strong>Bảo mật tối đa:</strong> Bản sao lưu đẩy lên Google Drive được <u>mã hóa AES-256-GCM</u> trước khi rời trình duyệt. Google Drive hoàn toàn không thể xem hoặc giải mã được mật khẩu của bạn.
+          </div>
+
+          <!-- CLIENT ID CONFIGURATION -->
+          <div class="form-group">
+            <label for="gdrive-client-id">Google OAuth 2.0 Client ID của bạn</label>
+            <input type="text" id="gdrive-client-id" placeholder="VD: 1234567890-abcdef.apps.googleusercontent.com">
+          </div>
+
+          <!-- REDIRECT URI DISPLAY FOR USER -->
+          <div class="redirect-info-box">
+            <div class="redirect-label">
+              <span>📌 <strong>Authorized Redirect URI</strong> (Copy dòng này dán vào Google Cloud Console):</span>
+            </div>
+            <div class="redirect-val-row">
+              <code id="redirect-uri-text">Đang tải...</code>
+              <button id="btn-copy-redirect-uri" class="btn btn-xs btn-outline">Copy URI</button>
+            </div>
+          </div>
+
+          <!-- GOOGLE ACCOUNT PROFILE AREA -->
+          <div id="gdrive-logged-out" class="gdrive-auth-box">
+            <p class="desc-sm">Kết nối tài khoản Google để thực hiện sao lưu và khôi phục tự động.</p>
+            <button id="btn-gdrive-login" class="btn btn-gdrive">
+              <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+              Kết nối Tài khoản Google
+            </button>
+          </div>
+
+          <div id="gdrive-logged-in" class="gdrive-auth-box hidden">
+            <div class="user-badge">
+              <img id="gdrive-avatar" class="avatar" src="" alt="Google Avatar">
+              <div class="user-details">
+                <span id="gdrive-name" class="user-name">Đang tải...</span>
+                <span id="gdrive-email" class="user-email">email@gmail.com</span>
+              </div>
+              <button id="btn-gdrive-logout" class="btn btn-xs btn-secondary">Đăng xuất</button>
+            </div>
+
+            <div class="action-buttons-row">
+              <button id="btn-gdrive-upload" class="btn btn-primary">
+                ☁️ Sao lưu ngay lên Google Drive
+              </button>
+              <button id="btn-gdrive-download" class="btn btn-outline">
+                📥 Tải bản sao lưu từ Google Drive
+              </button>
+            </div>
+          </div>
+
+          <div id="gdrive-status" class="alert hidden"></div>
+        </div>
+      </section>
+
+      <!-- SECTION 1: THIRD PARTY ENCRYPTED SYNC -->
+      <section class="card">
+        <div class="card-header">
+          <div class="icon-circle accent">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+              <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
+            </svg>
+          </div>
+          <div>
+            <h2>Lưu trữ Server / Webhook Tùy chỉnh (Mã hóa 100%)</h2>
+            <p class="desc">Gửi bản sao lưu vault đã được mã hóa AES-256 tới Server tùy chỉnh của bạn.</p>
+          </div>
+        </div>
+        
+        <div class="card-body">
+          <div class="form-group">
+            <label for="sync-endpoint">URL Server / Webhook bên thứ 3 (Endpoint POST)</label>
+            <input type="url" id="sync-endpoint" placeholder="https://api.your-cloud.com/v1/backups/kaypass">
+          </div>
+
+          <div class="form-group">
+            <label for="sync-headers">Custom Headers (JSON tùy chọn)</label>
+            <textarea id="sync-headers" rows="2" placeholder='{ "Authorization": "Bearer token_secret_here" }'></textarea>
+          </div>
+
+          <button id="btn-trigger-sync" class="btn btn-secondary">
+            🚀 Mã hóa & Gửi dữ liệu tới Webhook
+          </button>
+          
+          <div id="sync-status" class="alert hidden"></div>
+        </div>
+      </section>
+
+      <!-- SECTION 2: FILE EXPORT & IMPORT -->
+      <section class="card">
+        <div class="card-header">
+          <div class="icon-circle primary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+          </div>
+          <div>
+            <h2>Xuất & Nhập Tệp Sao lưu (Encrypted File Backup)</h2>
+            <p class="desc">Tải về tệp JSON mã hóa hoặc khôi phục dữ liệu từ bản sao lưu tệp.</p>
+          </div>
+        </div>
+
+        <div class="card-body">
+          <div class="sub-section">
+            <h3>Xuất tệp mã hóa (Export Encrypted Vault)</h3>
+            <p class="desc-sm">Tải về tệp <code>.json</code> chứa toàn bộ mật khẩu đã mã hóa an toàn.</p>
+            <button id="btn-export-file" class="btn btn-secondary">
+              📥 Tải tệp JSON Mã hóa
+            </button>
+          </div>
+
+          <hr class="divider">
+
+          <div class="sub-section">
+            <h3>Nhập tệp sao lưu (Import Backup)</h3>
+            <p class="desc-sm">Hệ thống sẽ tự động đối soát và giữ cặp (URL + Username) duy nhất khi gộp dữ liệu.</p>
+            <div class="file-drop-zone">
+              <input type="file" id="import-file-input" accept=".json">
+              <button id="btn-trigger-import" class="btn btn-outline">
+                📤 Chọn tệp JSON để nhập
+              </button>
+            </div>
+            <div id="import-status" class="alert hidden"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="../js/crypto.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
