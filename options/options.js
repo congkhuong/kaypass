@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const res = await chrome.runtime.sendMessage({ action: 'GOOGLE_DRIVE_UPLOAD' });
       if (res.success) {
         const timeStr = new Date(res.uploadedAt).toLocaleTimeString('vi-VN');
-        showStatus(gdriveStatus, 'success', `✅ Đã sao lưu dữ liệu mã hóa lên Google Drive thành công lúc ${timeStr}!`);
+        showStatus(gdriveStatus, 'success', `✅ Đã sao lưu thành công lúc ${timeStr}! Tệp mã hóa "KayPass_Encrypted_Backup.json" đã xuất hiện ngay tại trang chính Drive của tôi (https://drive.google.com/).`);
       } else {
         showStatus(gdriveStatus, 'error', `❌ Sao lưu thất bại: ${res.error}`);
       }

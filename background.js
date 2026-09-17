@@ -1,6 +1,6 @@
 /**
  * KayPass Background Service Worker (Manifest V3)
- * Includes Client-Side AES-256-GCM Crypto & Native Chrome Identity Google Drive Sync
+ * Includes Client-Side AES-256-GCM Crypto, Dual Google Drive Sync & Auto HTTP 401 Token Refresh
  */
 
 importScripts('js/crypto.js');
@@ -247,6 +247,8 @@ async function handleMessage(request, sender) {
         await chrome.storage.local.set({ [STORAGE_KEY_GOOGLE_CLIENT_ID]: clientId.trim() });
       }
       
+      // Force fresh token on login
+      await clearGoogleAuthToken();
       const token = await acquireGoogleToken(true);
       const userInfo = await getGoogleUserInfo(token);
       await chrome.storage.local.set({ 
@@ -256,12 +258,7 @@ async function handleMessage(request, sender) {
     }
 
     case 'GOOGLE_DRIVE_LOGOUT': {
-      const result = await chrome.storage.local.get(STORAGE_KEY_GOOGLE_USER);
-      if (result[STORAGE_KEY_GOOGLE_USER] && result[STORAGE_KEY_GOOGLE_USER].token) {
-        try {
-          await new Promise(resolve => chrome.identity.removeCachedAuthToken({ token: result[STORAGE_KEY_GOOGLE_USER].token }, resolve));
-        } catch (e) {}
-      }
+      await clearGoogleAuthToken();
       await chrome.storage.local.remove(STORAGE_KEY_GOOGLE_USER);
       return { success: true };
     }
@@ -279,69 +276,41 @@ async function handleMessage(request, sender) {
       const stored = await getStoredVault();
       if (!stored) throw new Error("Chưa có dữ liệu để sao lưu!");
 
-      const token = await acquireGoogleToken(true);
       const uploadPackage = {
         app: "KayPass",
         version: "1.1.0",
         uploadedAt: new Date().toISOString(),
         encryptedData: stored
       };
-
-      const fileId = await findDriveVaultFile(token);
       const content = JSON.stringify(uploadPackage, null, 2);
 
-      if (fileId) {
-        const updateRes = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: content
-        });
+      // 1. Save to hidden AppData folder
+      await saveDriveFile('kaypass_encrypted_vault.json', ['appDataFolder'], content);
 
-        if (!updateRes.ok) {
-          throw new Error(`Cập nhật file trên Google Drive thất bại: HTTP ${updateRes.status}`);
-        }
-      } else {
-        const metadata = {
-          name: 'kaypass_encrypted_vault.json',
-          parents: ['appDataFolder']
-        };
+      // 2. Save visible file in My Drive root so user can see it directly on drive.google.com!
+      const visibleFileId = await saveDriveFile('KayPass_Encrypted_Backup.json', ['root'], content);
 
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', new Blob([content], { type: 'application/json' }));
-
-        const createRes = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: form
-        });
-
-        if (!createRes.ok) {
-          throw new Error(`Tạo file trên Google Drive thất bại: HTTP ${createRes.status}`);
-        }
-      }
-
-      return { success: true, uploadedAt: uploadPackage.uploadedAt };
+      return { 
+        success: true, 
+        uploadedAt: uploadPackage.uploadedAt,
+        visibleFileId: visibleFileId
+      };
     }
 
     case 'GOOGLE_DRIVE_DOWNLOAD': {
       if (!masterPasswordSession) throw new Error("Vui lòng mở khóa KayPass trước khi tải sao lưu từ Google Drive!");
 
-      const token = await acquireGoogleToken(true);
-      const fileId = await findDriveVaultFile(token);
+      let fileId = await findDriveVaultFile('kaypass_encrypted_vault.json', 'appDataFolder');
+      if (!fileId) {
+        fileId = await findDriveVaultFile('KayPass_Encrypted_Backup.json', 'drive');
+      }
 
       if (!fileId) {
         throw new Error("Không tìm thấy bản sao lưu nào trên Google Drive của bạn!");
       }
 
-      const downloadRes = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const downloadRes = await fetchWithGoogleAuth(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+        method: 'GET'
       });
 
       if (!downloadRes.ok) {
@@ -358,14 +327,22 @@ async function handleMessage(request, sender) {
 }
 
 // Google Auth Helpers
+async function clearGoogleAuthToken() {
+  const userResult = await chrome.storage.local.get(STORAGE_KEY_GOOGLE_USER);
+  if (userResult[STORAGE_KEY_GOOGLE_USER] && userResult[STORAGE_KEY_GOOGLE_USER].token) {
+    try {
+      await new Promise(resolve => chrome.identity.removeCachedAuthToken({ token: userResult[STORAGE_KEY_GOOGLE_USER].token }, resolve));
+    } catch (e) {}
+  }
+  await chrome.storage.local.remove(STORAGE_KEY_GOOGLE_USER);
+}
+
 async function acquireGoogleToken(interactive = true) {
-  // First check if token is cached in chrome.storage.local
   const userResult = await chrome.storage.local.get(STORAGE_KEY_GOOGLE_USER);
   if (userResult[STORAGE_KEY_GOOGLE_USER] && userResult[STORAGE_KEY_GOOGLE_USER].token) {
     return userResult[STORAGE_KEY_GOOGLE_USER].token;
   }
 
-  // Primary: Native getAuthToken (Works directly when manifest.json oauth2.client_id matches Extension ID)
   try {
     return await new Promise((resolve, reject) => {
       chrome.identity.getAuthToken({ interactive }, (token) => {
@@ -379,7 +356,6 @@ async function acquireGoogleToken(interactive = true) {
       });
     });
   } catch (err) {
-    // Secondary fallback: WebAuthFlow if user supplied custom Client ID
     const clientIdResult = await chrome.storage.local.get(STORAGE_KEY_GOOGLE_CLIENT_ID);
     const customClientId = clientIdResult[STORAGE_KEY_GOOGLE_CLIENT_ID];
     if (customClientId) {
@@ -387,6 +363,24 @@ async function acquireGoogleToken(interactive = true) {
     }
     throw err;
   }
+}
+
+async function fetchWithGoogleAuth(url, options = {}) {
+  let token = await acquireGoogleToken(true);
+  options.headers = options.headers || {};
+  options.headers['Authorization'] = `Bearer ${token}`;
+
+  let res = await fetch(url, options);
+
+  // If HTTP 401 Unauthorized occurs, remove cached expired token and retry with a fresh token!
+  if (res.status === 401) {
+    await clearGoogleAuthToken();
+    token = await acquireGoogleToken(true);
+    options.headers['Authorization'] = `Bearer ${token}`;
+    res = await fetch(url, options);
+  }
+
+  return res;
 }
 
 function acquireTokenViaWebAuthFlow(clientId, interactive) {
@@ -429,22 +423,52 @@ function acquireTokenViaWebAuthFlow(clientId, interactive) {
 }
 
 async function getGoogleUserInfo(token) {
-  const res = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
+  const res = await fetchWithGoogleAuth('https://www.googleapis.com/oauth2/v2/userinfo');
   if (!res.ok) throw new Error("Không thể lấy thông tin tài khoản Google.");
   return await res.json();
 }
 
-async function findDriveVaultFile(token) {
-  const searchUrl = `https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='kaypass_encrypted_vault.json' and trashed=false`;
-  const res = await fetch(searchUrl, {
-    headers: { 'Authorization': `Bearer ${token}` }
-  });
-  if (!res.ok) throw new Error(`Lỗi tìm tệp trên Google Drive: HTTP ${res.status}`);
+async function findDriveVaultFile(fileName, space = 'appDataFolder') {
+  const searchUrl = `https://www.googleapis.com/drive/v3/files?spaces=${space}&q=name='${fileName}' and trashed=false`;
+  const res = await fetchWithGoogleAuth(searchUrl);
+  if (!res.ok) return null;
   const data = await res.json();
   if (data.files && data.files.length > 0) {
     return data.files[0].id;
   }
   return null;
+}
+
+async function saveDriveFile(fileName, parents, content) {
+  const space = parents.includes('appDataFolder') ? 'appDataFolder' : 'drive';
+  const existingId = await findDriveVaultFile(fileName, space);
+
+  if (existingId) {
+    const updateRes = await fetchWithGoogleAuth(`https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=media`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: content
+    });
+    if (!updateRes.ok) throw new Error(`Cập nhật file ${fileName} thất bại: HTTP ${updateRes.status}`);
+    return existingId;
+  } else {
+    const metadata = {
+      name: fileName,
+      parents: parents
+    };
+
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', new Blob([content], { type: 'application/json' }));
+
+    const createRes = await fetchWithGoogleAuth('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      body: form
+    });
+    if (!createRes.ok) throw new Error(`Tạo file ${fileName} thất bại: HTTP ${createRes.status}`);
+    const data = await createRes.json();
+    return data.id;
+  }
 }
