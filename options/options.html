@@ -24,7 +24,7 @@
     </header>
 
     <div class="grid">
-      <!-- SECTION 0: GOOGLE DRIVE ENCRYPTED SYNC -->
+      <!-- SECTION 0: DYNAMIC GOOGLE DRIVE ENCRYPTED SYNC -->
       <section class="card highlight-card">
         <div class="card-header">
           <div class="icon-circle gdrive">
@@ -34,7 +34,7 @@
           </div>
           <div>
             <h2>Đồng bộ Google Drive (Mã hóa Client-Side 100%)</h2>
-            <p class="desc">Lưu bản sao lưu AES-256 vào thư mục ẩn riêng biệt (AppData) trên Google Drive của bạn.</p>
+            <p class="desc">Cấu hình OAuth Client ID cá nhân để tự do đồng bộ dữ liệu trên bất kỳ máy tính nào.</p>
           </div>
         </div>
 
@@ -43,20 +43,24 @@
             🔒 <strong>Bảo mật tối đa:</strong> Bản sao lưu đẩy lên Google Drive được <u>mã hóa AES-256-GCM</u> trước khi rời trình duyệt. Google Drive hoàn toàn không thể xem hoặc giải mã được mật khẩu của bạn.
           </div>
 
-          <!-- CLIENT ID CONFIGURATION -->
-          <div class="form-group">
-            <label for="gdrive-client-id">Google OAuth 2.0 Client ID của bạn</label>
-            <input type="text" id="gdrive-client-id" placeholder="VD: 1234567890-abcdef.apps.googleusercontent.com">
-          </div>
-
           <!-- REDIRECT URI DISPLAY FOR USER -->
           <div class="redirect-info-box">
             <div class="redirect-label">
-              <span>📌 <strong>Authorized Redirect URI</strong> (Copy dòng này dán vào Google Cloud Console):</span>
+              <span>📌 <strong>1. Authorized Redirect URI cho máy này:</strong></span>
             </div>
             <div class="redirect-val-row">
               <code id="redirect-uri-text">Đang tải...</code>
               <button id="btn-copy-redirect-uri" class="btn btn-xs btn-outline">Copy URI</button>
+            </div>
+            <small class="hint">Dán URL này vào phần "Authorized redirect URIs" khi tạo Client ID (Loại Web Application) trên Google Cloud.</small>
+          </div>
+
+          <!-- CLIENT ID INPUT -->
+          <div class="form-group">
+            <label for="gdrive-client-id">📌 <strong>2. Google OAuth 2.0 Client ID của bạn:</strong></label>
+            <div class="input-with-btn">
+              <input type="text" id="gdrive-client-id" placeholder="VD: 1234567890-abcdef.apps.googleusercontent.com">
+              <button id="btn-save-client-id" class="btn btn-secondary">Lưu Client ID</button>
             </div>
           </div>
 

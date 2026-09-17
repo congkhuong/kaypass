@@ -232,6 +232,15 @@ body {
 }
 
 /* FORM ELEMENTS */
+.input-with-btn {
+  display: flex;
+  gap: 8px;
+}
+
+.input-with-btn input {
+  flex: 1;
+}
+
 .form-group {
   display: flex;
   flex-direction: column;

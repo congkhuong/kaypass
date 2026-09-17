@@ -1,6 +1,6 @@
 /**
  * KayPass Background Service Worker (Manifest V3)
- * Includes Client-Side AES-256-GCM Crypto, Dual Google Drive Sync & Auto HTTP 401 Token Refresh
+ * Dynamic Google OAuth 2.0 Client ID & Redirect URI Integration via WebAuthFlow
  */
 
 importScripts('js/crypto.js');
@@ -163,7 +163,7 @@ async function handleMessage(request, sender) {
       
       const exportPackage = {
         app: "KayPass",
-        version: "1.1.0",
+        version: "1.2.0",
         exportedAt: new Date().toISOString(),
         encryptedData: stored
       };
@@ -240,14 +240,22 @@ async function handleMessage(request, sender) {
       return { success: true, status: res.status };
     }
 
-    // --- GOOGLE DRIVE INTEGRATION ---
+    // --- DYNAMIC GOOGLE DRIVE INTEGRATION ---
+    case 'SAVE_GOOGLE_CLIENT_ID': {
+      const { clientId } = request;
+      if (!clientId || !clientId.trim()) {
+        throw new Error("Client ID không được để trống!");
+      }
+      await chrome.storage.local.set({ [STORAGE_KEY_GOOGLE_CLIENT_ID]: clientId.trim() });
+      return { success: true };
+    }
+
     case 'GOOGLE_DRIVE_LOGIN': {
       const { clientId } = request;
-      if (clientId) {
+      if (clientId && clientId.trim()) {
         await chrome.storage.local.set({ [STORAGE_KEY_GOOGLE_CLIENT_ID]: clientId.trim() });
       }
-      
-      // Force fresh token on login
+
       await clearGoogleAuthToken();
       const token = await acquireGoogleToken(true);
       const userInfo = await getGoogleUserInfo(token);
@@ -259,7 +267,6 @@ async function handleMessage(request, sender) {
 
     case 'GOOGLE_DRIVE_LOGOUT': {
       await clearGoogleAuthToken();
-      await chrome.storage.local.remove(STORAGE_KEY_GOOGLE_USER);
       return { success: true };
     }
 
@@ -268,7 +275,8 @@ async function handleMessage(request, sender) {
       return { 
         success: true, 
         userInfo: result[STORAGE_KEY_GOOGLE_USER] || null,
-        clientId: result[STORAGE_KEY_GOOGLE_CLIENT_ID] || '861545305575-1sgdbc7tl28dp417kglh29nqt9svsfgk.apps.googleusercontent.com'
+        clientId: result[STORAGE_KEY_GOOGLE_CLIENT_ID] || '',
+        redirectUri: chrome.identity.getRedirectURL()
       };
     }
 
@@ -278,7 +286,7 @@ async function handleMessage(request, sender) {
 
       const uploadPackage = {
         app: "KayPass",
-        version: "1.1.0",
+        version: "1.2.0",
         uploadedAt: new Date().toISOString(),
         encryptedData: stored
       };
@@ -287,7 +295,7 @@ async function handleMessage(request, sender) {
       // 1. Save to hidden AppData folder
       await saveDriveFile('kaypass_encrypted_vault.json', ['appDataFolder'], content);
 
-      // 2. Save visible file in My Drive root so user can see it directly on drive.google.com!
+      // 2. Save visible file in My Drive root so user can see it directly on drive.google.com
       const visibleFileId = await saveDriveFile('KayPass_Encrypted_Backup.json', ['root'], content);
 
       return { 
@@ -343,44 +351,14 @@ async function acquireGoogleToken(interactive = true) {
     return userResult[STORAGE_KEY_GOOGLE_USER].token;
   }
 
-  try {
-    return await new Promise((resolve, reject) => {
-      chrome.identity.getAuthToken({ interactive }, (token) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else if (!token) {
-          reject(new Error("Không lấy được Auth Token từ Google."));
-        } else {
-          resolve(token);
-        }
-      });
-    });
-  } catch (err) {
-    const clientIdResult = await chrome.storage.local.get(STORAGE_KEY_GOOGLE_CLIENT_ID);
-    const customClientId = clientIdResult[STORAGE_KEY_GOOGLE_CLIENT_ID];
-    if (customClientId) {
-      return await acquireTokenViaWebAuthFlow(customClientId, interactive);
-    }
-    throw err;
-  }
-}
+  const clientIdResult = await chrome.storage.local.get(STORAGE_KEY_GOOGLE_CLIENT_ID);
+  const customClientId = clientIdResult[STORAGE_KEY_GOOGLE_CLIENT_ID];
 
-async function fetchWithGoogleAuth(url, options = {}) {
-  let token = await acquireGoogleToken(true);
-  options.headers = options.headers || {};
-  options.headers['Authorization'] = `Bearer ${token}`;
-
-  let res = await fetch(url, options);
-
-  // If HTTP 401 Unauthorized occurs, remove cached expired token and retry with a fresh token!
-  if (res.status === 401) {
-    await clearGoogleAuthToken();
-    token = await acquireGoogleToken(true);
-    options.headers['Authorization'] = `Bearer ${token}`;
-    res = await fetch(url, options);
+  if (!customClientId) {
+    throw new Error("Chưa cấu hình Google OAuth Client ID! Vui lòng nhập Client ID trong phần cài đặt bên dưới.");
   }
 
-  return res;
+  return await acquireTokenViaWebAuthFlow(customClientId, interactive);
 }
 
 function acquireTokenViaWebAuthFlow(clientId, interactive) {
@@ -420,6 +398,23 @@ function acquireTokenViaWebAuthFlow(clientId, interactive) {
       }
     });
   });
+}
+
+async function fetchWithGoogleAuth(url, options = {}) {
+  let token = await acquireGoogleToken(true);
+  options.headers = options.headers || {};
+  options.headers['Authorization'] = `Bearer ${token}`;
+
+  let res = await fetch(url, options);
+
+  if (res.status === 401) {
+    await clearGoogleAuthToken();
+    token = await acquireGoogleToken(true);
+    options.headers['Authorization'] = `Bearer ${token}`;
+    res = await fetch(url, options);
+  }
+
+  return res;
 }
 
 async function getGoogleUserInfo(token) {

@@ -45,8 +45,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Initialize Google Status
-  await checkGoogleDriveStatus();
+  const btnSaveClientId = document.getElementById('btn-save-client-id');
+  if (btnSaveClientId) {
+    btnSaveClientId.addEventListener('click', async () => {
+      const clientId = gdriveClientIdInput.value.trim();
+      if (!clientId) {
+        showStatus(gdriveStatus, 'error', 'Vui lòng nhập Google Client ID!');
+        return;
+      }
+      try {
+        const res = await chrome.runtime.sendMessage({ action: 'SAVE_GOOGLE_CLIENT_ID', clientId });
+        if (res.success) {
+          showStatus(gdriveStatus, 'success', '✅ Đã lưu Google Client ID thành công!');
+        } else {
+          showStatus(gdriveStatus, 'error', res.error);
+        }
+      } catch (e) {
+        showStatus(gdriveStatus, 'error', e.message);
+      }
+    });
+  }
 
   // Load saved Webhook sync config
   const saved = await chrome.storage.local.get(['kaypass_sync_endpoint', 'kaypass_sync_headers']);
