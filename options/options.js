@@ -66,6 +66,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  // Load saved Client ID and Google Status
+  await checkGoogleDriveStatus();
+
   // Load saved Webhook sync config
   const saved = await chrome.storage.local.get(['kaypass_sync_endpoint', 'kaypass_sync_headers']);
   if (saved.kaypass_sync_endpoint) syncEndpointInput.value = saved.kaypass_sync_endpoint;

@@ -1,6 +1,6 @@
 /**
  * KayPass Background Service Worker (Manifest V3)
- * Dynamic Google OAuth 2.0 Client ID & Redirect URI Integration via WebAuthFlow
+ * Dual-Mode Google OAuth 2.0 (Native Chrome Extension getAuthToken + WebAuthFlow Fallback)
  */
 
 importScripts('js/crypto.js');
@@ -275,7 +275,7 @@ async function handleMessage(request, sender) {
       return { 
         success: true, 
         userInfo: result[STORAGE_KEY_GOOGLE_USER] || null,
-        clientId: result[STORAGE_KEY_GOOGLE_CLIENT_ID] || '',
+        clientId: result[STORAGE_KEY_GOOGLE_CLIENT_ID] || '861545305575-1sgdbc7tl28dp417kglh29nqt9svsfgk.apps.googleusercontent.com',
         redirectUri: chrome.identity.getRedirectURL()
       };
     }
@@ -351,8 +351,27 @@ async function acquireGoogleToken(interactive = true) {
     return userResult[STORAGE_KEY_GOOGLE_USER].token;
   }
 
+  // 1. First try native getAuthToken if manifest has oauth2 or native Chrome Extension Client ID
+  try {
+    const nativeToken = await new Promise((resolve, reject) => {
+      chrome.identity.getAuthToken({ interactive }, (token) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (!token) {
+          reject(new Error("No native token"));
+        } else {
+          resolve(token);
+        }
+      });
+    });
+    if (nativeToken) return nativeToken;
+  } catch (nativeErr) {
+    // If native failed, proceed to custom Client ID / WebAuthFlow
+  }
+
+  // 2. Fallback to launchWebAuthFlow using custom Client ID from storage
   const clientIdResult = await chrome.storage.local.get(STORAGE_KEY_GOOGLE_CLIENT_ID);
-  const customClientId = clientIdResult[STORAGE_KEY_GOOGLE_CLIENT_ID];
+  const customClientId = clientIdResult[STORAGE_KEY_GOOGLE_CLIENT_ID] || '861545305575-1sgdbc7tl28dp417kglh29nqt9svsfgk.apps.googleusercontent.com';
 
   if (!customClientId) {
     throw new Error("Chưa cấu hình Google OAuth Client ID! Vui lòng nhập Client ID trong phần cài đặt bên dưới.");
